@@ -2,6 +2,7 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { BudgetState } from '../types'
 import { formatCurrency, parseDecimal } from './format'
+import { calculateTotals } from './totals'
 
 function sanitizeForFileName(value: string): string {
   return value
@@ -40,11 +41,18 @@ function buildPdfDocument(state: BudgetState): jsPDF {
   doc.setTextColor(15, 23, 42)
   doc.text(companyName, textX, cursorY)
 
-  if (state.company.phone.trim()) {
+  const companySubline = [
+    state.company.phone.trim(),
+    state.company.nif.trim() ? `NIF ${state.company.nif.trim()}` : '',
+  ]
+    .filter(Boolean)
+    .join('  ·  ')
+
+  if (companySubline) {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
     doc.setTextColor(100, 116, 139)
-    doc.text(state.company.phone.trim(), textX, cursorY + 6)
+    doc.text(companySubline, textX, cursorY + 6)
   }
 
   doc.setFont('helvetica', 'bold')
@@ -70,11 +78,18 @@ function buildPdfDocument(state: BudgetState): jsPDF {
   doc.setFontSize(11)
   const valueX = marginX + Math.max(doc.getTextWidth('Cliente'), doc.getTextWidth('Morada/Obra')) + 6
 
+  const clientNameLine = [
+    state.client.name.trim() || '-',
+    state.client.nif.trim() ? `(NIF ${state.client.nif.trim()})` : '',
+  ]
+    .filter(Boolean)
+    .join('  ')
+
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(15, 23, 42)
   doc.text('Cliente', marginX, cursorY)
   doc.setFont('helvetica', 'normal')
-  doc.text(state.client.name.trim() || '-', valueX, cursorY)
+  doc.text(clientNameLine, valueX, cursorY)
 
   if (state.client.address.trim()) {
     cursorY += 6
@@ -115,11 +130,22 @@ function buildPdfDocument(state: BudgetState): jsPDF {
     },
   })
 
-  const grandTotal = state.items.reduce((sum, item) => {
-    return sum + parseDecimal(item.quantity) * parseDecimal(item.unitPrice)
-  }, 0)
+  const { subtotal, ivaRate, ivaAmount, total: grandTotal } = calculateTotals(state.items, state.iva)
+  const isento = state.iva.regime === 'isento'
 
-  const afterTableY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10
+  let afterTableY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10
+
+  if (!isento) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(71, 85, 105)
+    doc.text('Subtotal', pageWidth - marginX - 70, afterTableY)
+    doc.text(formatCurrency(subtotal), pageWidth - marginX - 4, afterTableY, { align: 'right' })
+    afterTableY += 6
+    doc.text(`IVA (${ivaRate.toString().replace('.', ',')}%)`, pageWidth - marginX - 70, afterTableY)
+    doc.text(formatCurrency(ivaAmount), pageWidth - marginX - 4, afterTableY, { align: 'right' })
+    afterTableY += 9
+  }
 
   doc.setFillColor(15, 23, 42)
   doc.roundedRect(pageWidth - marginX - 75, afterTableY - 7, 75, 14, 2, 2, 'F')
@@ -138,7 +164,10 @@ function buildPdfDocument(state: BudgetState): jsPDF {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(100, 116, 139)
-  doc.text('Validade do orçamento: 30 dias', marginX, footerY + 7)
+  const validadeLine = isento
+    ? 'Validade do orçamento: 30 dias  ·  Isento de IVA, artigo 53.º do CIVA'
+    : 'Validade do orçamento: 30 dias'
+  doc.text(validadeLine, marginX, footerY + 7)
 
   if (state.iban.trim()) {
     doc.text(`IBAN: ${state.iban.trim()}`, pageWidth - marginX, footerY + 7, { align: 'right' })

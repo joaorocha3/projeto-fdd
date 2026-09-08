@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CompanyCard } from './components/CompanyCard'
 import { ClientCard } from './components/ClientCard'
 import { ItemsSection } from './components/ItemsSection'
@@ -8,7 +8,6 @@ import { GenerateBar } from './components/GenerateBar'
 import type { Status } from './components/StatusBanner'
 import type { BudgetState, LineItem } from './types'
 import { loadBudget, saveBudget } from './utils/storage'
-import { parseDecimal } from './utils/format'
 
 function createEmptyItem(): LineItem {
   return { id: crypto.randomUUID(), description: '', quantity: '1', unitPrice: '' }
@@ -16,15 +15,29 @@ function createEmptyItem(): LineItem {
 
 function createDefaultState(): BudgetState {
   return {
-    company: { name: '', phone: '', logoDataUrl: null },
-    client: { name: '', address: '' },
+    company: { name: '', phone: '', nif: '', logoDataUrl: null },
+    client: { name: '', address: '', nif: '' },
     items: [createEmptyItem()],
+    iva: { regime: 'isento', taxa: '23' },
     iban: '',
   }
 }
 
+function loadInitialState(): BudgetState {
+  const defaults = createDefaultState()
+  const loaded = loadBudget()
+  if (!loaded) return defaults
+  return {
+    company: { ...defaults.company, ...loaded.company },
+    client: { ...defaults.client, ...loaded.client },
+    items: loaded.items?.length ? loaded.items : defaults.items,
+    iva: { ...defaults.iva, ...loaded.iva },
+    iban: loaded.iban ?? defaults.iban,
+  }
+}
+
 export default function App() {
-  const [state, setState] = useState<BudgetState>(() => loadBudget() ?? createDefaultState())
+  const [state, setState] = useState<BudgetState>(loadInitialState)
   const [status, setStatus] = useState<Status | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -44,18 +57,13 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [status])
 
-  const grandTotal = useMemo(
-    () =>
-      state.items.reduce((sum, item) => sum + parseDecimal(item.quantity) * parseDecimal(item.unitPrice), 0),
-    [state.items],
-  )
-
   function handleNewBudget() {
     const confirmed = window.confirm('Começar um novo orçamento? Os dados do cliente e os itens serão apagados.')
     if (!confirmed) return
     setState((prev) => ({
       ...createDefaultState(),
       company: prev.company,
+      iva: prev.iva,
       iban: prev.iban,
     }))
     setStatus(null)
@@ -110,7 +118,11 @@ export default function App() {
         />
         <ClientCard client={state.client} onChange={(client) => setState((prev) => ({ ...prev, client }))} />
         <ItemsSection items={state.items} onChange={(items) => setState((prev) => ({ ...prev, items }))} />
-        <SummaryCard total={grandTotal} />
+        <SummaryCard
+          items={state.items}
+          iva={state.iva}
+          onIvaChange={(iva) => setState((prev) => ({ ...prev, iva }))}
+        />
         <FooterCard iban={state.iban} onChange={(iban) => setState((prev) => ({ ...prev, iban }))} />
       </div>
 

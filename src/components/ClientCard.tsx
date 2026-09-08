@@ -28,6 +28,16 @@ export function ClientCard({ client, onChange }: ClientCardProps) {
             onChange={(e) => onChange({ ...client, address: e.target.value })}
           />
         </div>
+        <div>
+          <FieldLabel>NIF do cliente (opcional)</FieldLabel>
+          <input
+            className={inputClasses}
+            placeholder="Ex: 123456789"
+            inputMode="numeric"
+            value={client.nif}
+            onChange={(e) => onChange({ ...client, nif: e.target.value })}
+          />
+        </div>
       </div>
     </Card>
   )

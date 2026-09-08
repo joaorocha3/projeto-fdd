@@ -62,16 +62,28 @@ export function CompanyCard({ company, onChange, onError }: CompanyCardProps) {
           </div>
         </div>
       </div>
-      <div className="mt-3">
-        <FieldLabel>Telefone</FieldLabel>
-        <input
-          className={inputClasses}
-          placeholder="Ex: 912 345 678"
-          type="tel"
-          inputMode="tel"
-          value={company.phone}
-          onChange={(e) => onChange({ ...company, phone: e.target.value })}
-        />
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div>
+          <FieldLabel>Telefone</FieldLabel>
+          <input
+            className={inputClasses}
+            placeholder="Ex: 912 345 678"
+            type="tel"
+            inputMode="tel"
+            value={company.phone}
+            onChange={(e) => onChange({ ...company, phone: e.target.value })}
+          />
+        </div>
+        <div>
+          <FieldLabel>NIF</FieldLabel>
+          <input
+            className={inputClasses}
+            placeholder="Ex: 123456789"
+            inputMode="numeric"
+            value={company.nif}
+            onChange={(e) => onChange({ ...company, nif: e.target.value })}
+          />
+        </div>
       </div>
     </Card>
   )
